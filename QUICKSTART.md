@@ -1,26 +1,26 @@
-# Primus Network SDK Quick Start Guide
+# Primus network-js-sdk Quick Start
 
-Get started with Primus Network SDK in 5 minutes and complete your first Attestation task.
+Get started with `@primuslabs/network-js-sdk` in 5 minutes and integrate zkTLS attestations into your DApp.
 
 ---
 
 ## Prerequisites
 
-1. **Install MetaMask** browser extension
-2. **Install Primus Extension** [Download from Chrome Store](https://chromewebstore.google.com/detail/primus-prev-pado/oeiomhmbaapihbilkfkhmlajkeegnjhe) (version ≥ 0.3.44)
-3. **Get Testnet ETH** - From [Base Sepolia Faucet](https://sepolia.basescan.org/faucet)
+1. **MetaMask** browser extension installed
+2. **Primus Extension** [Download](https://chromewebstore.google.com/detail/primus-prev-pado/oeiomhmbaapihbilkfkhmlajkeegnjhe) (version ≥ 0.3.44)
+3. **Testnet ETH** — Get from [Base Sepolia Faucet](https://sepolia.basescan.org/faucet)
 
 ---
 
-## Step 1: Create Project
+## Step 1: Create DApp Project
 
 ```bash
 # Create new project
-mkdir my-primus-app
-cd my-primus-app
+mkdir my-dapp-primus
+cd my-dapp-primus
 
-# Initialize npm project
-npm init -y
+# Initialize with Vite (React template)
+npm create vite@latest . -- --template react-ts
 
 # Install dependencies
 npm install @primuslabs/network-js-sdk ethers@5
@@ -30,246 +30,332 @@ npm install @primuslabs/network-js-sdk ethers@5
 
 ## Step 2: Create Template
 
-Before writing code, create a template on the Primus Developer Platform:
+Before coding, create an attestation template:
 
 1. Visit [Primus Developer Hub](https://dev.primuslabs.xyz/myDevelopment/myTemplates/new)
 2. Login and create a new template
-3. Configure template parameters (data fields to verify, API endpoints, etc.)
-4. **Save the Template ID** - You'll need it in the code
+3. Configure:
+   - **API Endpoint** to verify
+   - **Data Fields** to extract
+   - **Verification Conditions**
+4. **Save Template ID** — You'll need this in your DApp code
 
-Example template configuration:
+Example:
 - **Template Name:** X Account Ownership
-- **Template ID:** `2e3160ae-8b1e-45e3-8c59-426366278b9d` (example)
+- **Template ID:** `2e3160ae-8b1e-45e3-8c59-426366278b9d`
 
 ---
 
-## Step 3: Write Code
+## Step 3: Build DApp Component
 
-Create `index.html`:
+Create `src/components/AttestationWidget.tsx`:
 
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Primus Network SDK Demo</title>
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
-    button { padding: 12px 24px; font-size: 16px; margin: 10px 0; cursor: pointer; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
-    .success { background: #d4edda; color: #155724; }
-    .error { background: #f8d7da; color: #721c24; }
-    .info { background: #d1ecf1; color: #0c5460; }
-    pre { background: #f4f4f4; padding: 15px; overflow-x: auto; }
-  </style>
-</head>
-<body>
-  <h1>🔐 Primus Network SDK Demo</h1>
-  
-  <div id="status" class="status info">Ready</div>
-  
-  <button id="connectBtn" onclick="connectWallet()">🔗 Connect Wallet</button>
-  <button id="submitBtn" onclick="submitTask()" disabled>📝 Submit Task</button>
-  <button id="attestBtn" onclick="attestTask()" disabled>✅ Execute Attestation</button>
-  <button id="pollBtn" onclick="pollResult()" disabled>🔄 Query Result</button>
-  
-  <h3>📊 Result:</h3>
-  <pre id="output">Waiting for operation...</pre>
+```typescript
+import { useState } from 'react';
+import { PrimusNetwork } from "@primuslabs/network-js-sdk";
+import { ethers } from "ethers";
 
-  <script type="module">
-    import { PrimusNetwork } from "@primuslabs/network-js-sdk";
-    import { ethers } from "ethers";
+const TEMPLATE_ID = "YOUR_TEMPLATE_ID"; // Replace with your template ID
 
-    const CHAINID = 84532; // Base Sepolia
-    const TEMPLATE_ID = "YOUR_TEMPLATE_ID"; // Replace with your template ID
-    
-    let primusNetwork;
-    let signer;
-    let userAddress;
-    let submitTaskResult;
-    let attestResult;
+export default function AttestationWidget() {
+  const [step, setStep] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState('');
 
-    window.connectWallet = async () => {
+  // Step 1: Connect Wallet
+  const connectWallet = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      if (!window.ethereum) throw new Error('MetaMask not installed');
+      
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      
+      // Switch to Base Sepolia
       try {
-        updateStatus("Connecting wallet...", "info");
-        
-        // Connect MetaMask
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
-        await provider.send("eth_requestAccounts", []);
-        signer = provider.getSigner();
-        userAddress = await signer.getAddress();
-        
-        // Switch network
-        try {
-          await provider.send("wallet_switchEthereumChain", [
-            { chainId: "0x" + CHAINID.toString(16) }
-          ]);
-        } catch (switchError) {
-          if (switchError.code === 4902) {
-            await provider.send("wallet_addEthereumChain", [{
-              chainId: "0x" + CHAINID.toString(16),
-              chainName: "Base Sepolia",
-              rpcUrls: ["https://sepolia.base.org"],
-              nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
-              blockExplorerUrls: ["https://sepolia.basescan.org"]
-            }]);
-          }
+        await provider.send("wallet_switchEthereumChain", [
+          { chainId: "0x" + (84532).toString(16) }
+        ]);
+      } catch (switchError: any) {
+        if (switchError.code === 4902) {
+          await provider.send("wallet_addEthereumChain", [{
+            chainId: "0x" + (84532).toString(16),
+            chainName: "Base Sepolia",
+            rpcUrls: ["https://sepolia.base.org"],
+            nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+            blockExplorerUrls: ["https://sepolia.basescan.org"]
+          }]);
         }
-        
-        // Initialize SDK
-        primusNetwork = new PrimusNetwork();
-        await primusNetwork.init(signer, CHAINID);
-        
-        updateStatus(`✅ Wallet connected: ${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`, "success");
-        document.getElementById('submitBtn').disabled = false;
-        
-      } catch (error) {
-        updateStatus(`❌ Error: ${error.message}`, "error");
       }
-    };
-
-    window.submitTask = async () => {
-      try {
-        updateStatus("📝 Submitting task...", "info");
-        document.getElementById('submitBtn').disabled = true;
-        
-        submitTaskResult = await primusNetwork.submitTask({
-          templateId: TEMPLATE_ID,
-          address: userAddress
-        });
-        
-        output(`Task submitted successfully!\nTask ID: ${submitTaskResult.taskId}\nTransaction Hash: ${submitTaskResult.taskTxHash}\nAttestors: ${submitTaskResult.taskAttestors.join(', ')}`);
-        updateStatus("✅ Task submitted", "success");
-        document.getElementById('attestBtn').disabled = false;
-        
-      } catch (error) {
-        updateStatus(`❌ Error: ${error.message}`, "error");
-        document.getElementById('submitBtn').disabled = false;
-      }
-    };
-
-    window.attestTask = async () => {
-      try {
-        updateStatus("✅ Executing Attestation...", "info");
-        document.getElementById('attestBtn').disabled = true;
-        
-        attestResult = await primusNetwork.attest({
-          templateId: TEMPLATE_ID,
-          address: userAddress,
-          ...submitTaskResult
-        });
-        
-        output(`Attestation completed!\nAttestor: ${attestResult[0].attestor}\nReport Hash: ${attestResult[0].reportTxHash}`);
-        updateStatus("✅ Attestation completed", "success");
-        document.getElementById('pollBtn').disabled = false;
-        
-      } catch (error) {
-        updateStatus(`❌ Error: ${error.message}`, "error");
-        document.getElementById('attestBtn').disabled = false;
-      }
-    };
-
-    window.pollResult = async () => {
-      try {
-        updateStatus("🔄 Querying result...", "info");
-        document.getElementById('pollBtn').disabled = true;
-        
-        const taskResult = await primusNetwork.verifyAndPollTaskResult({
-          taskId: attestResult[0].taskId,
-          reportTxHash: attestResult[0].reportTxHash,
-          intervalMs: 2000,
-          timeoutMs: 120000
-        });
-        
-        output(`Task completed!\nStatus: SUCCESS\nData: ${JSON.stringify(taskResult, null, 2)}`);
-        updateStatus("✅ Task completed", "success");
-        
-      } catch (error) {
-        updateStatus(`❌ Error: ${error.message}`, "error");
-        document.getElementById('pollBtn').disabled = false;
-      }
-    };
-
-    function updateStatus(message, type) {
-      const statusEl = document.getElementById('status');
-      statusEl.textContent = message;
-      statusEl.className = `status ${type}`;
+      
+      setStep(1);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    function output(text) {
-      document.getElementById('output').textContent = text;
+  // Step 2: Submit Task
+  const submitTask = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const address = await signer.getAddress();
+      
+      const primusNetwork = new PrimusNetwork();
+      await primusNetwork.init(signer, 84532);
+      
+      const submitResult = await primusNetwork.submitTask({
+        templateId: TEMPLATE_ID,
+        address
+      });
+      
+      setResult({ submitResult });
+      setStep(2);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-  </script>
-</body>
-</html>
+  };
+
+  // Step 3: Execute Attestation
+  const executeAttestation = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const address = await signer.getAddress();
+      
+      const primusNetwork = new PrimusNetwork();
+      await primusNetwork.init(signer, 84532);
+      
+      const attestResult = await primusNetwork.attest({
+        templateId: TEMPLATE_ID,
+        address,
+        ...(result as any).submitResult
+      });
+      
+      setResult({ ...(result as any), attestResult });
+      setStep(3);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 4: Poll Result
+  const pollResult = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      
+      const primusNetwork = new PrimusNetwork();
+      await primusNetwork.init(signer, 84532);
+      
+      const taskResult = await primusNetwork.verifyAndPollTaskResult({
+        taskId: (result as any).attestResult[0].taskId,
+        reportTxHash: (result as any).attestResult[0].reportTxHash,
+        intervalMs: 2000,
+        timeoutMs: 120000
+      });
+      
+      setResult({ ...(result as any), taskResult });
+      setStep(4);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
+      <h2>🔐 Primus Attestation DApp</h2>
+      
+      {/* Progress Steps */}
+      <div style={{ marginBottom: '20px' }}>
+        {['Connect Wallet', 'Submit Task', 'Attest', 'Get Result'].map((s, i) => (
+          <span key={s} style={{ 
+            marginRight: '10px',
+            color: i <= step ? '#4caf50' : '#ccc',
+            fontWeight: i === step ? 'bold' : 'normal'
+          }}>
+            {i + 1}. {s} {i < 3 ? '→' : ''}
+          </span>
+        ))}
+      </div>
+      
+      {/* Action Buttons */}
+      <div>
+        {step === 0 && (
+          <button onClick={connectWallet} disabled={loading}>
+            {loading ? 'Connecting...' : '🔗 Connect Wallet'}
+          </button>
+        )}
+        {step === 1 && (
+          <button onClick={submitTask} disabled={loading}>
+            {loading ? 'Submitting...' : '📝 Submit Attestation Task'}
+          </button>
+        )}
+        {step === 2 && (
+          <button onClick={executeAttestation} disabled={loading}>
+            {loading ? 'Attesting...' : '✅ Execute Attestation'}
+          </button>
+        )}
+        {step === 3 && (
+          <button onClick={pollResult} disabled={loading}>
+            {loading ? 'Polling...' : '🔄 Get Verified Result'}
+          </button>
+        )}
+      </div>
+      
+      {/* Error Display */}
+      {error && (
+        <div style={{ color: 'red', marginTop: '10px' }}>
+          ❌ {error}
+        </div>
+      )}
+      
+      {/* Result Display */}
+      {step === 4 && result && (
+        <div style={{ marginTop: '20px', padding: '15px', background: '#e8f5e9', borderRadius: '8px' }}>
+          <h3>✅ Verification Complete!</h3>
+          <pre style={{ fontSize: '12px', overflow: 'auto' }}>
+            {JSON.stringify(result.taskResult, null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
 ```
 
 ---
 
-## Step 4: Run Application
+## Step 4: Use in Your DApp
 
-Use Vite to start a development server quickly:
+Update `src/App.tsx`:
+
+```typescript
+import AttestationWidget from './components/AttestationWidget';
+
+function App() {
+  return (
+    <div>
+      <AttestationWidget />
+    </div>
+  );
+}
+
+export default App;
+```
+
+---
+
+## Step 5: Run Your DApp
 
 ```bash
-# Install Vite
-npm install -D vite
-
 # Start development server
-npx vite
+npm run dev
 ```
 
-Open your browser and navigate to `http://localhost:5173`, then:
+Open `http://localhost:5173` and:
 
-1. Click **"🔗 Connect Wallet"** - Authorize MetaMask access
-2. Click **"📝 Submit Task"** - Submit Attestation task
-3. Click **"✅ Execute Attestation"** - Perform verification
-4. Click **"🔄 Query Result"** - Get final result
+1. **🔗 Connect Wallet** — Connect MetaMask
+2. **📝 Submit Task** — Create attestation on-chain
+3. **✅ Execute Attestation** — Browser performs zkTLS proof
+4. **🔄 Get Result** — View verified data
 
 ---
 
 ## Complete Flow
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│ Connect     │ ──► │ Submit      │ ──► │ Execute     │ ──► │ Query       │
-│ Wallet      │     │ Task        │     │ Attestation │     │ Result      │
-└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
-     │                   │                   │                   │
-     ▼                   ▼                   ▼                   ▼
-  Get Address        Create Task        Node Verification   Get Result
-  Switch Network     Assign Attestor    Submit Report       Parse Data
+User's Browser
+     │
+     ▼
+┌─────────────────┐
+│  Your DApp UI   │
+│  (React/Vue)    │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ network-js-sdk  │
+│  - init()       │
+│  - submitTask() │
+│  - attest()     │
+│  - pollResult() │
+└────────┬────────┘
+         │
+         ├──────────────┐
+         ▼              ▼
+┌─────────────┐  ┌─────────────┐
+│   MetaMask  │  │   Primus    │
+│  (Signer)   │  │  Extension  │
+│             │  │  (zkTLS)    │
+└─────────────┘  └─────────────┘
+         │              │
+         └──────┬───────┘
+                ▼
+         ┌─────────────┐
+         │ Base Chain  │
+         │ (Smart      │
+         │  Contracts) │
+         └─────────────┘
 ```
 
 ---
 
-## FAQ
+## FAQ for DApp Developers
 
 ### 1. "MetaMask not detected"
-- Ensure MetaMask extension is installed
-- Refresh the page and try again
+```typescript
+if (!window.ethereum) {
+  alert('Please install MetaMask: https://metamask.io');
+}
+```
 
-### 2. "chainId is not supported"
-- Ensure you're using a supported network (84532 or 8453)
-- Check if wallet is switched to the correct network
+### 2. "Wrong Network"
+```typescript
+// Auto-switch to Base Sepolia
+await provider.send("wallet_switchEthereumChain", [
+  { chainId: "0x" + (84532).toString(16) }
+]);
+```
 
-### 3. Transaction Failed / Insufficient Gas
-- Ensure wallet has enough testnet ETH
-- Get ETH from [Base Sepolia Faucet](https://sepolia.basescan.org/faucet)
+### 3. "Attestation Timeout"
+```typescript
+// Increase timeout for production
+const result = await primusNetwork.verifyAndPollTaskResult({
+  taskId,
+  reportTxHash,
+  timeoutMs: 180000 // 3 minutes
+});
+```
 
-### 4. Attestation Timeout
-- Increase `timeoutMs` parameter
-- Check network connection
-- Verify template configuration is correct
+### 4. "Insufficient Gas"
+- User needs ETH for gas fees
+- Get testnet ETH: https://sepolia.basescan.org/faucet
 
 ---
 
 ## Next Steps
 
-- Read [Complete API Documentation](./API-REFERENCE.md)
-- Check [Example Code](https://github.com/primus-labs/zktls-demo/tree/main/network-sdk-example)
-- Create more templates on [Developer Platform](https://dev.primuslabs.xyz)
+- Read [Complete API Reference](./API-REFERENCE.md)
+- Check [Demo DApp Code](https://github.com/primus-labs/zktls-demo/tree/main/network-sdk-example)
+- Create templates at [Developer Platform](https://dev.primuslabs.xyz)
+- Join [Discord](https://discord.gg/primus) for support
 
 ---
 

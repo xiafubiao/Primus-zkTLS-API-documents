@@ -1,6 +1,6 @@
-# Primus Network SDK API Reference
+# Primus network-js-sdk API 参考文档
 
-完整的 Primus Network SDK API 接口文档，用于区块链网络交互、任务提交、Attestation 执行和结果查询。
+`@primuslabs/network-js-sdk` 完整 API 文档 — 用于 DApp 集成 Primus zkTLS 网络的 TypeScript/JavaScript SDK。
 
 ---
 
@@ -8,8 +8,8 @@
 
 - [概述](#概述)
 - [安装](#安装)
-- [快速开始](#快速开始)
-- [API 接口详解](#api-接口详解)
+- [DApp 快速集成](#dapp-快速集成)
+- [API 参考](#api-参考)
   - [init](#initprovider-chainid)
   - [submitTask](#submittaskattestparams)
   - [attest](#attestattestparams)
@@ -20,19 +20,27 @@
 - [类型定义](#类型定义)
 - [支持的网络](#支持的网络)
 - [错误处理](#错误处理)
-- [完整示例](#完整示例)
+- [完整 DApp 示例](#完整-dapp-示例)
 
 ---
 
 ## 概述
 
-PrimusNetwork SDK 是一个 TypeScript 库，用于与 Primus 区块链网络进行交互。它封装了智能合约交互，提供开发者友好的 API，主要功能包括：
+`@primuslabs/network-js-sdk` 是一个专为 **DApp 集成** 设计的 TypeScript/JavaScript 库，用于与 Primus zkTLS 网络交互。它使 Web 应用能够直接在浏览器中执行隐私保护的链下数据证明。
 
-- **SDK 初始化**：连接到指定的区块链网络
-- **任务提交**：提交需要 Attestation 的任务到网络
-- **Attestation 执行**：使用选定的节点进行验证
-- **状态轮询**：持续检查任务状态和结果
-- **余额提取**：从合约中领取奖励
+**DApp 开发者核心功能：**
+
+- **浏览器优先**：与 MetaMask 等浏览器钱包无缝集成
+- **简单集成**： minimal 代码即可为 DApp 添加 zkTLS 证明
+- **完整流程**：提交任务 → 执行证明 → 轮询结果 → 提取奖励
+- **多链支持**：Base Sepolia（测试网）和 Base Mainnet
+
+**常见 DApp 用例：**
+
+- 🔐 **身份验证**：证明社交媒体账号所有权，无需暴露凭证
+- 💰 **DeFi 借贷**：验证收入区间，无需暴露具体金额
+- 🎯 **信用评分**：将 Web2 信用评分证明上链
+- 📊 **数据验证**：使用零知识证明验证任意 Web2 API 响应
 
 ---
 
@@ -46,16 +54,33 @@ npm install @primuslabs/network-js-sdk
 yarn add @primuslabs/network-js-sdk
 ```
 
-### 依赖
+### DApp 集成
 
-- `ethers` v5.x - 用于区块链交互
-- 需要安装 [Primus Browser Extension](https://chromewebstore.google.com/detail/primus-prev-pado/oeiomhmbaapihbilkfkhmlajkeegnjhe) (版本 ≥ 0.3.44)
+**前端框架：**
+
+```bash
+# React / Next.js
+npm install @primuslabs/network-js-sdk ethers@5
+
+# Vue / Nuxt
+npm install @primuslabs/network-js-sdk ethers@5
+
+# 纯 JS (CDN)
+<script type="module">
+  import { PrimusNetwork } from "https://cdn.jsdelivr.net/npm/@primuslabs/network-js-sdk@latest/+esm";
+</script>
+```
+
+**必需依赖：**
+
+- `ethers` v5.x — 用于区块链交互（MetaMask、WalletConnect 等）
+- [Primus Browser Extension](https://chromewebstore.google.com/detail/primus-prev-pado/oeiomhmbaapihbilkfkhmlajkeegnjhe) (版本 ≥ 0.3.44) — 浏览器中执行 zkTLS 证明必需
 
 ---
 
-## 快速开始
+## DApp 快速集成
 
-### 1. 初始化 SDK
+### 1. 在 DApp 中初始化
 
 ```typescript
 import { PrimusNetwork } from "@primuslabs/network-js-sdk";
@@ -63,23 +88,24 @@ import { ethers } from "ethers";
 
 const primusNetwork = new PrimusNetwork();
 
-async function initialize() {
-  // 使用 MetaMask 提供者
+async function initializeDApp() {
+  // 连接用户钱包（MetaMask 等）
   if (typeof window !== "undefined" && window.ethereum) {
     const provider = new ethers.providers.Web3Provider(window.ethereum);
     
-    // 请求账户访问
+    // 请求钱包连接
     await provider.send("eth_requestAccounts", []);
     const signer = provider.getSigner();
+    const userAddress = await signer.getAddress();
     
-    // 切换到 Base Sepolia 网络 (Chain ID: 84532)
+    // 切换到 Base Sepolia（测试网）或 Base Mainnet
     await provider.send("wallet_switchEthereumChain", [
       { chainId: "0x" + (84532).toString(16) }
     ]);
     
-    // 初始化 SDK
+    // 初始化 Primus SDK
     await primusNetwork.init(signer, 84532);
-    console.log("SDK 初始化成功");
+    console.log("✅ Primus SDK 已就绪，用户:", userAddress);
   }
 }
 ```
@@ -88,12 +114,12 @@ async function initialize() {
 
 ```typescript
 console.log(primusNetwork.supportedChainIds); 
-// 输出：[84532, 8453]
+// 输出：[84532, 8453] - Base Sepolia 和 Base Mainnet
 ```
 
 ---
 
-## API 接口详解
+## API 参考
 
 ### `init(provider, chainId)`
 
@@ -101,113 +127,110 @@ console.log(primusNetwork.supportedChainIds);
 
 **参数：**
 
-| 参数 | 类型 | 必填 | 描述 |
+| 参数 | 类型 | 必需 | 描述 |
 |------|------|------|------|
-| `provider` | `ethers.providers.Web3Provider` \| `ethers.providers.JsonRpcProvider` \| `ethers.providers.JsonRpcSigner` | 是 | 以太坊提供者，可以是 MetaMask、WalletConnect 或自定义节点 |
-| `chainId` | `number` | 是 | 链 ID，必须是支持的网络（84532 或 8453） |
+| `provider` | `ethers.providers.Web3Provider` \| `ethers.providers.JsonRpcProvider` \| `ethers.providers.JsonRpcSigner` | 是 | 用户钱包的以太坊提供者（MetaMask、WalletConnect 等） |
+| `chainId` | `number` | 是 | 链 ID：`84532`（Base Sepolia）或 `8453`（Base Mainnet） |
 
-**返回值：** `Promise<boolean>` - 初始化成功返回 `true`
+**返回值：** `Promise<boolean>` — 成功返回 `true`
 
 **异常：**
-- `chainId is not supported` - 不支持的链 ID
-- `Please connect to the chain with ID ${chainId} first.` - 提供者未连接到指定的链
+- `chainId is not supported` — 不支持的链 ID
+- `Please connect to the chain with ID ${chainId} first.` — 钱包未连接到正确网络
 
-**示例：**
+**DApp 示例：**
 
 ```typescript
-const provider = new ethers.providers.Web3Provider(window.ethereum);
-const signer = provider.getSigner();
-await primusNetwork.init(signer, 84532); // Base Sepolia
+// 在 React 组件或纯 JS 中
+async function connectWallet() {
+  const provider = new ethers.providers.Web3Provider(window.ethereum);
+  await provider.send("eth_requestAccounts", []);
+  const signer = provider.getSigner();
+  
+  await primusNetwork.init(signer, 84532); // Base Sepolia 测试网
+}
 ```
 
 ---
 
 ### `submitTask(attestParams)`
 
-向网络提交一个新的 Attestation 任务。
+从 DApp 向 Primus 网络提交新的证明任务。
 
 **参数：**
 
 ```typescript
 type PrimaryAttestationParams = {
-  templateId: string;  // 任务模板 ID，在 Primus 开发者平台创建
+  templateId: string;  // 来自 Primus 开发者平台的模板 ID
   address: string;     // 用户钱包地址
 }
 ```
 
-| 参数 | 类型 | 必填 | 描述 |
+| 参数 | 类型 | 必需 | 描述 |
 |------|------|------|------|
-| `templateId` | `string` | 是 | 任务模板的唯一标识符 |
-| `address` | `string` | 是 | 提交任务的用户地址 |
+| `templateId` | `string` | 是 | 在 https://dev.primuslabs.xyz 创建的模板 ID |
+| `address` | `string` | 是 | 用户钱包地址（从连接的钱包获取） |
 
 **返回值：** `Promise<SubmitTaskReturnParams>`
 
 ```typescript
 type SubmitTaskReturnParams = {
-  taskId: string;        // 任务的唯一标识符
-  taskTxHash: string;    // 提交任务的交易哈希
-  taskAttestors: string[]; // 分配给该任务的 Attestor 节点地址列表
-  submittedAt: number;   // 任务提交时间戳（秒）
+  taskId: string;        // 唯一任务 ID
+  taskTxHash: string;    // 交易哈希
+  taskAttestors: string[]; // 分配的证明节点
+  submittedAt: number;   // 提交时间戳
 }
 ```
 
-**异常：**
-- 模板 ID 无效
-- 网络错误
-- Gas 不足
-
-**示例：**
+**DApp 示例：**
 
 ```typescript
-const submitTaskParams = {
-  templateId: "2e3160ae-8b1e-45e3-8c59-426366278b9d",
-  address: "0x1234567890abcdef1234567890abcdef12345678"
-};
+// 用户连接钱包后
+const userAddress = await signer.getAddress();
 
-const result = await primusNetwork.submitTask(submitTaskParams);
-console.log("任务已提交:", result);
-// {
-//   taskId: "0xabc...",
-//   taskTxHash: "0xdef...",
-//   taskAttestors: ["0xnode1...", "0xnode2..."],
-//   submittedAt: 1709107200
-// }
+const submitResult = await primusNetwork.submitTask({
+  templateId: "2e3160ae-8b1e-45e3-8c59-426366278b9d",
+  address: userAddress
+});
+
+console.log("任务已提交:", submitResult.taskId);
+// 保存 submitResult 用于下一步
 ```
 
 ---
 
 ### `attest(attestParams)`
 
-使用分配的 Attestor 节点执行 Attestation 验证。
+使用分配的证明节点执行 Attestation。这是 zkTLS 魔法发生的地方。
 
 **参数：**
 
 ```typescript
 type AttestAfterSubmitTaskParams = {
-  // 必需参数（来自 submitTask 返回值）
+  // 必需（来自 submitTask 返回值）
   templateId: string;
   address: string;
   taskId: string;
   taskTxHash: string;
   taskAttestors: string[];
   
-  // 可选参数
-  extendedParams?: string;      // JSON 字符串，扩展参数
-  allJsonResponseFlag?: 'true' | 'false';  // 是否获取完整 JSON 响应
-  attConditions?: AttConditions; // Attestation 条件
+  // 可选
+  extendedParams?: string;      // JSON 字符串：{ attUrlOptimization: true }
+  allJsonResponseFlag?: 'true' | 'false';
+  attConditions?: AttConditions;
 }
 ```
 
-| 参数 | 类型 | 必填 | 描述 |
+| 参数 | 类型 | 必需 | 描述 |
 |------|------|------|------|
-| `templateId` | `string` | 是 | 任务模板 ID |
-| `address` | `string` | 是 | 用户地址 |
-| `taskId` | `string` | 是 | 任务 ID（来自 submitTask 返回值） |
-| `taskTxHash` | `string` | 是 | 任务交易哈希（来自 submitTask 返回值） |
-| `taskAttestors` | `string[]` | 是 | Attestor 节点列表（来自 submitTask 返回值） |
-| `extendedParams` | `string` | 否 | JSON 字符串格式的扩展参数，如 `{ attUrlOptimization: true }` |
-| `allJsonResponseFlag` | `'true' \| 'false'` | 否 | 是否获取完整的 HTTP 响应内容 |
-| `attConditions` | `AttConditions` | 否 | Attestation 验证条件 |
+| `templateId` | `string` | 是 | 与 submitTask 相同的模板 ID |
+| `address` | `string` | 是 | 用户钱包地址 |
+| `taskId` | `string` | 是 | 来自 `submitTask` 结果 |
+| `taskTxHash` | `string` | 是 | 来自 `submitTask` 结果 |
+| `taskAttestors` | `string[]` | 是 | 来自 `submitTask` 结果 |
+| `extendedParams` | `string` | 否 | 扩展参数如 `{ attUrlOptimization: true }` |
+| `allJsonResponseFlag` | `'true' \| 'false'` | 否 | 获取完整 HTTP 响应 |
+| `attConditions` | `AttConditions` | 否 | 自定义证明条件 |
 
 **返回值：** `Promise<RawAttestationResultList>`
 
@@ -215,218 +238,160 @@ type AttestAfterSubmitTaskParams = {
 type RawAttestationResultList = RawAttestationResult[];
 
 type RawAttestationResult = {
-  taskId: string;           // 任务 ID
-  attestor: string;         // Attestor 地址
-  attestation: any;         // Attestation 数据对象
-  signature: string;        // 签名
-  reportTxHash: string;     // 报告交易哈希
-  attestorUrl: string;      // 使用的 Attestor URL
-  attestationTime: number | string; // Attestation 时间
+  taskId: string;
+  attestor: string;
+  attestation: any;
+  signature: string;
+  reportTxHash: string;
+  attestorUrl: string;
+  attestationTime: number | string;
 }
 ```
 
-**内部流程：**
-1. 从合约获取 Attestor 节点信息
-2. 通过速度测试选择最快的 WebSocket URL
-3. 依次使用每个 Attestor 节点执行证明
-4. 将结果提交到链上
-
-**示例：**
+**DApp 示例：**
 
 ```typescript
-const attestParams = {
-  templateId: "2e3160ae-8b1e-45e3-8c59-426366278b9d",
-  address: "0x1234567890abcdef1234567890abcdef12345678",
-  taskId: submitTaskResult.taskId,
-  taskTxHash: submitTaskResult.taskTxHash,
-  taskAttestors: submitTaskResult.taskAttestors,
-  // 可选参数
-  extendedParams: JSON.stringify({ attUrlOptimization: true })
-};
+const attestResult = await primusNetwork.attest({
+  templateId: "YOUR_TEMPLATE_ID",
+  address: userAddress,
+  taskId: submitResult.taskId,
+  taskTxHash: submitResult.taskTxHash,
+  taskAttestors: submitResult.taskAttestors
+});
 
-const attestResult = await primusNetwork.attest(attestParams);
-console.log("Attestation 完成:", attestResult);
-// [
-//   {
-//     taskId: "0xabc...",
-//     attestor: "0xnode1...",
-//     attestation: { ... },
-//     signature: "0x...",
-//     reportTxHash: "0x...",
-//     attestorUrl: "wss://node1.primus.io",
-//     attestationTime: 1709107260
-//   }
-// ]
+console.log("证明完成:", attestResult[0].reportTxHash);
 ```
 
 ---
 
 ### `verifyAndPollTaskResult(params)`
 
-轮询并验证任务结果，直到任务完成或超时。
+轮询任务状态直到完成。在 DApp UI 中使用此方法向用户显示进度。
 
 **参数：**
 
 ```typescript
 type VerifyAndPollTaskResultParams = {
-  taskId: string;           // 任务 ID（必需）
-  reportTxHash?: string;    // 报告交易哈希（可选，来自 attest 返回值）
-  intervalMs?: number;      // 轮询间隔（毫秒），默认 2000
-  timeoutMs?: number;       // 超时时间（毫秒），默认 60000 (1 分钟)
+  taskId: string;        // 必需
+  reportTxHash?: string; // 可选，来自 attest 结果
+  intervalMs?: number;   // 默认：2000
+  timeoutMs?: number;    // 默认：60000（1 分钟）
 }
 ```
 
-| 参数 | 类型 | 必填 | 默认值 | 描述 |
+| 参数 | 类型 | 必需 | 默认值 | 描述 |
 |------|------|------|--------|------|
-| `taskId` | `string` | 是 | - | 任务 ID |
-| `reportTxHash` | `string` | 否 | - | 报告交易哈希，用于获取区块号加速查询 |
+| `taskId` | `string` | 是 | - | 要轮询的任务 ID |
+| `reportTxHash` | `string` | 否 | - | 报告哈希，用于更快查询 |
 | `intervalMs` | `number` | 否 | `2000` | 轮询间隔（毫秒） |
 | `timeoutMs` | `number` | 否 | `60000` | 超时时间（毫秒） |
 
 **返回值：** `Promise<TaskResult[]>`
 
-```typescript
-type TaskResult = {
-  taskId: string;
-  attestor: string;
-  attestation: AttestationInContract;
-}
-
-type AttestationInContract = {
-  recipient: string;
-  request: AttNetworkRequest[];
-  responseResolve: AttNetworkResponseResolve[];
-  data: string;              // JSON 字符串格式的真实数据
-  attConditions: string;     // JSON 字符串格式的 Attestation 参数
-  timestamp: bigint;
-  additionParams: string;
-}
-```
-
-**任务状态枚举：**
+**任务状态：**
 
 ```typescript
 enum TaskStatus {
-  INIT = 0,                    // 初始状态
-  SUCCESS = 1,                 // 成功
-  PARTIAL_SUCCESS = 2,         // 部分成功
-  PARTIAL_SUCCESS_SETTLED = 3, // 部分成功且已结算
-  FAILED = 4                   // 失败
+  INIT = 0,
+  SUCCESS = 1,
+  PARTIAL_SUCCESS = 2,
+  PARTIAL_SUCCESS_SETTLED = 3,
+  FAILED = 4
 }
 ```
 
-**异常：**
-- `Polling timeout` - 轮询超时
-- `Polling fail` - 轮询失败（任务状态为 INIT 或 FAILED）
-
-**示例：**
+**DApp 示例：**
 
 ```typescript
-// 使用 attest 返回的 reportTxHash
-const verifyParams = {
-  taskId: attestResult[0].taskId,
-  reportTxHash: attestResult[0].reportTxHash,
-  intervalMs: 2000,
-  timeoutMs: 60000
-};
+// 在 UI 中显示加载状态
+setLoading(true);
 
-const taskResult = await primusNetwork.verifyAndPollTaskResult(verifyParams);
-console.log("最终结果:", taskResult);
-// [
-//   {
-//     taskId: "0xabc...",
-//     attestor: "0xnode1...",
-//     attestation: {
-//       recipient: "0x...",
-//       request: [...],
-//       responseResolve: [...],
-//       data: '{"verified": true, "value": "..."}',
-//       ...
-//     }
-//   }
-// ]
+try {
+  const taskResult = await primusNetwork.verifyAndPollTaskResult({
+    taskId: attestResult[0].taskId,
+    reportTxHash: attestResult[0].reportTxHash,
+    intervalMs: 2000,
+    timeoutMs: 120000 // DApp 使用 2 分钟
+  });
+  
+  console.log("✅ 验证完成:", taskResult);
+  // 用验证数据更新 UI
+} catch (error) {
+  console.error("验证失败:", error);
+  // 向用户显示错误
+} finally {
+  setLoading(false);
+}
 ```
 
 ---
 
 ### `withdrawBalance(tokenSymbol?, limit?)`
 
-从合约中提取已结算任务的奖励。
+提取已结算任务的奖励。通常在 DApp 管理功能或用户仪表板中使用。
 
 **参数：**
 
-| 参数 | 类型 | 必填 | 默认值 | 描述 |
+| 参数 | 类型 | 必需 | 默认值 | 描述 |
 |------|------|------|--------|------|
-| `tokenSymbol` | `TokenSymbol` | 否 | `TokenSymbol.ETH` | 代币符号 |
+| `tokenSymbol` | `TokenSymbol` | 否 | `TokenSymbol.ETH` | 代币类型 |
 | `limit` | `number` | 否 | `100` | 最大提取任务数 |
 
-**返回值：** `Promise<string[]>` - 已结算的任务 ID 列表
+**返回值：** `Promise<string[]>` — 已结算任务 ID 列表
 
-**示例：**
+**DApp 示例：**
 
 ```typescript
 import { TokenSymbol } from "@primuslabs/network-js-sdk";
 
-const settledTaskIds = await primusNetwork.withdrawBalance(TokenSymbol.ETH, 100);
-console.log("已提取的任务:", settledTaskIds);
-// ["0xtask1...", "0xtask2...", ...]
+// 在用户仪表板或管理面板中
+const settledTasks = await primusNetwork.withdrawBalance(TokenSymbol.ETH, 100);
+console.log("已提取奖励的任务:", settledTasks);
 ```
 
 ---
 
 ### `queryTaskDetail(taskId)`
 
-查询任务的详细信息。
+查询详细任务信息。用于 DApp UI 显示任务状态。
 
 **参数：**
 
-| 参数 | 类型 | 必填 | 描述 |
+| 参数 | 类型 | 必需 | 描述 |
 |------|------|------|------|
 | `taskId` | `string` | 是 | 任务 ID |
 
-**返回值：** `Promise<TaskInfo>` - 任务详细信息
+**返回值：** `Promise<TaskInfo>`
+
+**DApp 示例：**
 
 ```typescript
-type TaskInfo = {
-  templateId: string;
-  submitter: string;
-  attestors: string[];
-  taskResults: TaskResult[];
-  submittedAt: bigint;
-  taskStatus: TaskStatus;
-  tokenSymbol: TokenSymbol;
-  callback: string;
-}
-```
-
-**示例：**
-
-```typescript
+// 在 UI 中显示任务状态
 const taskDetail = await primusNetwork.queryTaskDetail(taskId);
-console.log("任务详情:", taskDetail);
+console.log("任务状态:", TaskStatus[taskDetail.taskStatus]);
 ```
 
 ---
 
 ### `getAllJsonResponse(taskId)`
 
-获取任务的完整 HTTP 响应内容（需要在 attest 时设置 `allJsonResponseFlag: 'true'`）。
+获取证明的完整 HTTP 响应。需要在 attest 调用时设置 `allJsonResponseFlag: 'true'`。
 
 **参数：**
 
-| 参数 | 类型 | 必填 | 描述 |
+| 参数 | 类型 | 必需 | 描述 |
 |------|------|------|------|
 | `taskId` | `string` | 是 | 任务 ID |
 
-**返回值：** `string | undefined` - JSON 字符串格式的完整响应
+**返回值：** `string | undefined` — JSON 响应字符串
 
-**示例：**
+**DApp 示例：**
 
 ```typescript
 const jsonResponse = primusNetwork.getAllJsonResponse(taskId);
 if (jsonResponse) {
   const data = JSON.parse(jsonResponse);
-  console.log("完整响应:", data);
+  // 在 UI 中显示验证数据
 }
 ```
 
@@ -434,65 +399,49 @@ if (jsonResponse) {
 
 ## 类型定义
 
-### 核心类型
+### DApp 开发者核心类型
 
 ```typescript
-// 基础 Attestation 参数
+// 任务提交
 type PrimaryAttestationParams = {
   templateId: string;
   address: string;
 }
 
-// 高级 Attestation 参数
-type SeniorAttestationParams = {
-  additionParams?: string;
-  attMode?: AttMode;
-  attConditions?: AttConditions;
-  backUrl?: string;
-  computeMode?: ComputeMode;
-  extendedParams?: string;
-  allJsonResponseFlag?: 'true' | 'false';
-}
-
-// Attestation 模式
+// 证明模式
 type AttMode = {
   algorithmType: 'mpctls' | 'proxytls';
   resultType: 'plain' | 'cipher';
 }
 
-// 计算模式
-type ComputeMode = 'nonecomplete' | 'nonepartial' | 'normal';
-
-// Attestation 条件
+// 证明条件
 type AttConditions = AttCondition[];
-type AttCondition = AttSubCondition[];
 type AttSubCondition = {
   field: string;
-  op: OpType;
+  op: OpType;  // '>' | '>=' | '=' | '!=' | '<' | '<=' | 'SHA256' | 'REVEAL_STRING'
   value?: string;
 }
 
-// 操作符类型
-type OpType = '>' | '>=' | '=' | '!=' | '<' | '<=' | 'SHA256' | 'REVEAL_STRING';
-
-// 网络请求
+// 网络请求（在模板中定义）
 type AttNetworkRequest = {
   url: string;
-  header: string;      // JSON 字符串
+  header: string;
   method: string;
   body: string;
 }
 
-// 响应解析
-type AttNetworkResponseResolve = {
-  keyName: string;
-  parseType: string;   // 'json' or 'html'
-  parsePath: string;
-}
-
-// 代币符号
+// 代币
 enum TokenSymbol {
   ETH
+}
+
+// 任务状态
+enum TaskStatus {
+  INIT = 0,
+  SUCCESS = 1,
+  PARTIAL_SUCCESS = 2,
+  PARTIAL_SUCCESS_SETTLED = 3,
+  FAILED = 4
 }
 ```
 
@@ -500,148 +449,149 @@ enum TokenSymbol {
 
 ## 支持的网络
 
-| Chain ID | 网络名称 | 合约地址 |
-|----------|----------|----------|
-| 84532 | Base Sepolia (测试网) | Task: `0xC02234058caEaA9416506eABf6Ef3122fCA939E8`<br>Node: `0xF7dc28456B19b2f8ca80B363c911CaDE1FB84bC6` |
-| 8453 | Base Mainnet (主网) | Task: `0x151cb5eD5D10A42B607bB172B27BDF6F884b9707`<br>Node: `0x9C1bb8197720d08dA6B9dab5704a406a24C97642` |
+| Chain ID | 网络 | 用途 |
+|----------|------|------|
+| 84532 | Base Sepolia | ✅ 开发和测试 |
+| 8453 | Base Mainnet | ✅ 生产环境 DApp |
 
-### 添加 Base Sepolia 到 MetaMask
+### 为用户添加 Base Sepolia 到钱包
 
 ```typescript
-await provider.send("wallet_addEthereumChain", [{
-  chainId: "0x" + (84532).toString(16),
-  chainName: "Base Sepolia",
-  rpcUrls: ["https://sepolia.base.org"],
-  nativeCurrency: {
-    name: "ETH",
-    symbol: "ETH",
-    decimals: 18
-  },
-  blockExplorerUrls: ["https://sepolia.basescan.org"]
-}]);
+async function addBaseSepolia() {
+  await provider.send("wallet_addEthereumChain", [{
+    chainId: "0x" + (84532).toString(16),
+    chainName: "Base Sepolia",
+    rpcUrls: ["https://sepolia.base.org"],
+    nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+    blockExplorerUrls: ["https://sepolia.basescan.org"]
+  }]);
+}
 ```
 
 ---
 
-## 错误处理
-
-SDK 使用标准 Promise 错误处理，建议使用 try-catch：
+## DApp 错误处理
 
 ```typescript
 try {
   await primusNetwork.init(signer, 84532);
-  const submitResult = await primusNetwork.submitTask(params);
-  const attestResult = await primusNetwork.attest({ ...submitResult, ...params });
-  const taskResult = await primusNetwork.verifyAndPollTaskResult({
-    taskId: attestResult[0].taskId,
-    reportTxHash: attestResult[0].reportTxHash
-  });
-} catch (error) {
-  console.error("操作失败:", error);
-  // 根据错误类型进行相应处理
-}
-```
-
-### 常见错误
-
-| 错误 | 原因 | 解决方案 |
-|------|------|----------|
-| `chainId is not supported` | 不支持的链 ID | 使用 84532 或 8453 |
-| `Please connect to the chain with ID ${chainId} first.` | 钱包未切换到正确网络 | 使用 `wallet_switchEthereumChain` |
-| `MetaMask not detected` | 未安装 MetaMask | 安装 MetaMask 扩展 |
-| `Polling timeout` | 任务执行超时 | 增加 `timeoutMs` 或检查任务状态 |
-| Gas 不足 | 钱包 ETH 余额不足 | 充值测试网 ETH |
-
----
-
-## 完整示例
-
-```typescript
-import { PrimusNetwork, TokenSymbol } from "@primuslabs/network-js-sdk";
-import { ethers } from "ethers";
-
-async function main() {
-  // 初始化
-  const provider = new ethers.providers.Web3Provider(window.ethereum);
-  await provider.send("eth_requestAccounts", []);
-  const signer = provider.getSigner();
-  
-  const primusNetwork = new PrimusNetwork();
-  const CHAINID = 84532; // Base Sepolia
-  
-  // 切换网络
-  await provider.send("wallet_switchEthereumChain", [
-    { chainId: "0x" + CHAINID.toString(16) }
-  ]);
-  
-  // 初始化 SDK
-  await primusNetwork.init(signer, CHAINID);
-  console.log("✅ SDK 初始化成功");
-  
-  // 获取用户地址
-  const userAddress = await signer.getAddress();
-  
-  try {
-    // 1. 提交任务
-    const submitTaskParams = {
-      templateId: "YOUR_TEMPLATE_ID",
-      address: userAddress
-    };
-    
-    const submitTaskResult: any = await primusNetwork.submitTask(submitTaskParams);
-    console.log("✅ 任务已提交:", submitTaskResult);
-    
-    // 2. 执行 Attestation
-    const attestParams = {
-      ...submitTaskParams,
-      ...submitTaskResult,
-      extendedParams: JSON.stringify({ attUrlOptimization: true })
-    };
-    
-    const attestResult = await primusNetwork.attest(attestParams);
-    console.log("✅ Attestation 完成:", attestResult);
-    
-    // 3. 轮询任务结果
-    const taskResult = await primusNetwork.verifyAndPollTaskResult({
-      taskId: attestResult[0].taskId,
-      reportTxHash: attestResult[0].reportTxHash,
-      intervalMs: 2000,
-      timeoutMs: 120000 // 2 分钟超时
-    });
-    
-    console.log("✅ 最终结果:", taskResult);
-    
-    // 4. (可选) 获取完整 HTTP 响应
-    const jsonResponse = primusNetwork.getAllJsonResponse(attestParams.taskId);
-    if (jsonResponse) {
-      console.log("完整响应:", JSON.parse(jsonResponse));
-    }
-    
-    // 5. (可选) 提取奖励
-    // const settledTaskIds = await primusNetwork.withdrawBalance(TokenSymbol.ETH);
-    // console.log("已提取的任务:", settledTaskIds);
-    
-  } catch (error) {
-    console.error("❌ 操作失败:", error);
-    throw error;
+  const result = await primusNetwork.submitTask(params);
+  // ... 继续流程
+} catch (error: any) {
+  // 用户友好的错误消息
+  if (error.message.includes("chainId")) {
+    alert("请切换到 Base Sepolia 网络");
+  } else if (error.message.includes("MetaMask")) {
+    alert("请安装 MetaMask 以使用此 DApp");
+  } else if (error.message.includes("Polling timeout")) {
+    alert("验证时间较长，请稍后查看或重试");
+  } else {
+    alert("操作失败：" + error.message);
   }
 }
+```
 
-// 运行
-main();
+### 常见 DApp 错误
+
+| 错误 | 用户友好提示 |
+|------|-------------|
+| `chainId is not supported` | "请切换到 Base Sepolia 或 Base Mainnet 网络" |
+| `MetaMask not detected` | "请安装 MetaMask 以使用此 DApp" |
+| `Polling timeout` | "验证时间较长，请等待或重试" |
+| Insufficient Gas | "Gas 不足，请在钱包中添加一些 ETH" |
+
+---
+
+## 完整 DApp 示例
+
+### React 组件示例
+
+```typescript
+import { useState } from 'react';
+import { PrimusNetwork } from "@primuslabs/network-js-sdk";
+import { ethers } from "ethers";
+
+const TEMPLATE_ID = "YOUR_TEMPLATE_ID";
+
+export default function AttestationWidget() {
+  const [status, setStatus] = useState('disconnected');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const handleConnect = async () => {
+    setLoading(true);
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      const signer = provider.getSigner();
+      
+      const primusNetwork = new PrimusNetwork();
+      await primusNetwork.init(signer, 84532);
+      
+      setStatus('connected');
+      setLoading(false);
+    } catch (error) {
+      setStatus('error');
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitTask = async () => {
+    setLoading(true);
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const userAddress = await signer.getAddress();
+      
+      const primusNetwork = new PrimusNetwork();
+      await primusNetwork.init(signer, 84532);
+      
+      const submitResult = await primusNetwork.submitTask({
+        templateId: TEMPLATE_ID,
+        address: userAddress
+      });
+      
+      setStatus('submitted');
+      setLoading(false);
+      return submitResult;
+    } catch (error) {
+      setStatus('error');
+      setLoading(false);
+    }
+  };
+
+  // ... 继续实现 attest 和 pollResult
+  
+  return (
+    <div>
+      {status === 'disconnected' && (
+        <button onClick={handleConnect} disabled={loading}>
+          {loading ? '连接中...' : '连接钱包'}
+        </button>
+      )}
+      {status === 'connected' && (
+        <button onClick={handleSubmitTask} disabled={loading}>
+          {loading ? '提交中...' : '提交证明'}
+        </button>
+      )}
+      {result && <pre>{JSON.stringify(result, null, 2)}</pre>}
+    </div>
+  );
+}
 ```
 
 ---
 
-## 相关资源
+## DApp 开发者资源
 
-- [Primus 开发者平台](https://dev.primuslabs.xyz)
-- [Chrome 扩展下载](https://chromewebstore.google.com/detail/primus-prev-pado/oeiomhmbaapihbilkfkhmlajkeegnjhe)
-- [GitHub SDK 仓库](https://github.com/primus-labs/primus-network-sdk)
-- [示例代码](https://github.com/primus-labs/zktls-demo/tree/main/network-sdk-example)
+- **Primus 开发者平台**: https://dev.primuslabs.xyz — 创建模板
+- **Chrome 扩展**: [下载](https://chromewebstore.google.com/detail/primus-prev-pado/oeiomhmbaapihbilkfkhmlajkeegnjhe)
+- **GitHub SDK**: https://github.com/primus-labs/primus-network-sdk
+- **演示 DApp**: https://github.com/primus-labs/zktls-demo/tree/main/network-sdk-example
+- **Discord 支持**: https://discord.gg/primus
 
 ---
 
-**文档版本：** 1.0  
-**SDK 版本：** 参考 [primus-network-sdk](https://github.com/primus-labs/primus-network-sdk)  
-**最后更新：** 2026-02-28
+**SDK 版本:** 查看 [@primuslabs/network-js-sdk](https://www.npmjs.com/package/@primuslabs/network-js-sdk)  
+**最后更新:** 2026-02-28  
+**面向:** DApp 开发者
