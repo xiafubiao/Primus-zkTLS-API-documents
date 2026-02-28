@@ -1,51 +1,51 @@
-# Primus Network SDK Quick Start Guide
+# Primus Network SDK 快速入门指南
 
-Get started with Primus Network SDK in 5 minutes and complete your first Attestation task.
-
----
-
-## Prerequisites
-
-1. **Install MetaMask** browser extension
-2. **Install Primus Extension** [Download from Chrome Store](https://chromewebstore.google.com/detail/primus-prev-pado/oeiomhmbaapihbilkfkhmlajkeegnjhe) (version ≥ 0.3.44)
-3. **Get Testnet ETH** - From [Base Sepolia Faucet](https://sepolia.basescan.org/faucet)
+5 分钟快速上手 Primus Network SDK，完成第一次 Attestation 任务。
 
 ---
 
-## Step 1: Create Project
+## 前置条件
+
+1. **安装 MetaMask** 浏览器扩展
+2. **安装 Primus Extension** [从 Chrome 商店下载](https://chromewebstore.google.com/detail/primus-prev-pado/oeiomhmbaapihbilkfkhmlajkeegnjhe) (版本 ≥ 0.3.44)
+3. **准备测试网 ETH** - 从 [Base Sepolia Faucet](https://sepolia.basescan.org/faucet) 获取
+
+---
+
+## 步骤 1：创建项目
 
 ```bash
-# Create new project
+# 创建新项目
 mkdir my-primus-app
 cd my-primus-app
 
-# Initialize npm project
+# 初始化 npm 项目
 npm init -y
 
-# Install dependencies
+# 安装依赖
 npm install @primuslabs/network-js-sdk ethers@5
 ```
 
 ---
 
-## Step 2: Create Template
+## 步骤 2：创建模板
 
-Before writing code, create a template on the Primus Developer Platform:
+在编写代码之前，需要先在 Primus 开发者平台创建模板：
 
-1. Visit [Primus Developer Hub](https://dev.primuslabs.xyz/myDevelopment/myTemplates/new)
-2. Login and create a new template
-3. Configure template parameters (data fields to verify, API endpoints, etc.)
-4. **Save the Template ID** - You'll need it in the code
+1. 访问 [Primus Developer Hub](https://dev.primuslabs.xyz/myDevelopment/myTemplates/new)
+2. 登录并创建新模板
+3. 配置模板参数（如要验证的数据字段、API 端点等）
+4. **保存 Template ID** - 后续代码中需要用到
 
-Example template configuration:
+示例模板配置：
 - **Template Name:** X Account Ownership
-- **Template ID:** `2e3160ae-8b1e-45e3-8c59-426366278b9d` (example)
+- **Template ID:** `2e3160ae-8b1e-45e3-8c59-426366278b9d` (示例)
 
 ---
 
-## Step 3: Write Code
+## 步骤 3：编写代码
 
-Create `index.html`:
+创建 `index.html`：
 
 ```html
 <!DOCTYPE html>
@@ -68,22 +68,22 @@ Create `index.html`:
 <body>
   <h1>🔐 Primus Network SDK Demo</h1>
   
-  <div id="status" class="status info">Ready</div>
+  <div id="status" class="status info">准备就绪</div>
   
-  <button id="connectBtn" onclick="connectWallet()">🔗 Connect Wallet</button>
-  <button id="submitBtn" onclick="submitTask()" disabled>📝 Submit Task</button>
-  <button id="attestBtn" onclick="attestTask()" disabled>✅ Execute Attestation</button>
-  <button id="pollBtn" onclick="pollResult()" disabled>🔄 Query Result</button>
+  <button id="connectBtn" onclick="connectWallet()">🔗 连接钱包</button>
+  <button id="submitBtn" onclick="submitTask()" disabled>📝 提交任务</button>
+  <button id="attestBtn" onclick="attestTask()" disabled>✅ 执行 Attestation</button>
+  <button id="pollBtn" onclick="pollResult()" disabled>🔄 查询结果</button>
   
-  <h3>📊 Result:</h3>
-  <pre id="output">Waiting for operation...</pre>
+  <h3>📊 结果:</h3>
+  <pre id="output">等待操作...</pre>
 
   <script type="module">
     import { PrimusNetwork } from "@primuslabs/network-js-sdk";
     import { ethers } from "ethers";
 
     const CHAINID = 84532; // Base Sepolia
-    const TEMPLATE_ID = "YOUR_TEMPLATE_ID"; // Replace with your template ID
+    const TEMPLATE_ID = "YOUR_TEMPLATE_ID"; // 替换为你的模板 ID
     
     let primusNetwork;
     let signer;
@@ -93,15 +93,15 @@ Create `index.html`:
 
     window.connectWallet = async () => {
       try {
-        updateStatus("Connecting wallet...", "info");
+        updateStatus("连接钱包中...", "info");
         
-        // Connect MetaMask
+        // 连接 MetaMask
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         await provider.send("eth_requestAccounts", []);
         signer = provider.getSigner();
         userAddress = await signer.getAddress();
         
-        // Switch network
+        // 切换网络
         try {
           await provider.send("wallet_switchEthereumChain", [
             { chainId: "0x" + CHAINID.toString(16) }
@@ -118,21 +118,21 @@ Create `index.html`:
           }
         }
         
-        // Initialize SDK
+        // 初始化 SDK
         primusNetwork = new PrimusNetwork();
         await primusNetwork.init(signer, CHAINID);
         
-        updateStatus(`✅ Wallet connected: ${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`, "success");
+        updateStatus(`✅ 钱包已连接：${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`, "success");
         document.getElementById('submitBtn').disabled = false;
         
       } catch (error) {
-        updateStatus(`❌ Error: ${error.message}`, "error");
+        updateStatus(`❌ 错误：${error.message}`, "error");
       }
     };
 
     window.submitTask = async () => {
       try {
-        updateStatus("📝 Submitting task...", "info");
+        updateStatus("📝 提交任务中...", "info");
         document.getElementById('submitBtn').disabled = true;
         
         submitTaskResult = await primusNetwork.submitTask({
@@ -140,19 +140,19 @@ Create `index.html`:
           address: userAddress
         });
         
-        output(`Task submitted successfully!\nTask ID: ${submitTaskResult.taskId}\nTransaction Hash: ${submitTaskResult.taskTxHash}\nAttestors: ${submitTaskResult.taskAttestors.join(', ')}`);
-        updateStatus("✅ Task submitted", "success");
+        output(`任务提交成功!\n任务 ID: ${submitTaskResult.taskId}\n交易哈希：${submitTaskResult.taskTxHash}\nAttestors: ${submitTaskResult.taskAttestors.join(', ')}`);
+        updateStatus("✅ 任务已提交", "success");
         document.getElementById('attestBtn').disabled = false;
         
       } catch (error) {
-        updateStatus(`❌ Error: ${error.message}`, "error");
+        updateStatus(`❌ 错误：${error.message}`, "error");
         document.getElementById('submitBtn').disabled = false;
       }
     };
 
     window.attestTask = async () => {
       try {
-        updateStatus("✅ Executing Attestation...", "info");
+        updateStatus("✅ 执行 Attestation 中...", "info");
         document.getElementById('attestBtn').disabled = true;
         
         attestResult = await primusNetwork.attest({
@@ -161,19 +161,19 @@ Create `index.html`:
           ...submitTaskResult
         });
         
-        output(`Attestation completed!\nAttestor: ${attestResult[0].attestor}\nReport Hash: ${attestResult[0].reportTxHash}`);
-        updateStatus("✅ Attestation completed", "success");
+        output(`Attestation 完成!\nAttestor: ${attestResult[0].attestor}\n报告哈希：${attestResult[0].reportTxHash}`);
+        updateStatus("✅ Attestation 已完成", "success");
         document.getElementById('pollBtn').disabled = false;
         
       } catch (error) {
-        updateStatus(`❌ Error: ${error.message}`, "error");
+        updateStatus(`❌ 错误：${error.message}`, "error");
         document.getElementById('attestBtn').disabled = false;
       }
     };
 
     window.pollResult = async () => {
       try {
-        updateStatus("🔄 Querying result...", "info");
+        updateStatus("🔄 查询结果中...", "info");
         document.getElementById('pollBtn').disabled = true;
         
         const taskResult = await primusNetwork.verifyAndPollTaskResult({
@@ -183,11 +183,11 @@ Create `index.html`:
           timeoutMs: 120000
         });
         
-        output(`Task completed!\nStatus: SUCCESS\nData: ${JSON.stringify(taskResult, null, 2)}`);
-        updateStatus("✅ Task completed", "success");
+        output(`任务完成!\n状态：SUCCESS\n数据：${JSON.stringify(taskResult, null, 2)}`);
+        updateStatus("✅ 任务已完成", "success");
         
       } catch (error) {
-        updateStatus(`❌ Error: ${error.message}`, "error");
+        updateStatus(`❌ 错误：${error.message}`, "error");
         document.getElementById('pollBtn').disabled = false;
       }
     };
@@ -208,69 +208,69 @@ Create `index.html`:
 
 ---
 
-## Step 4: Run Application
+## 步骤 4：运行应用
 
-Use Vite to start a development server quickly:
+使用 Vite 快速启动开发服务器：
 
 ```bash
-# Install Vite
+# 安装 Vite
 npm install -D vite
 
-# Start development server
+# 启动开发服务器
 npx vite
 ```
 
-Open your browser and navigate to `http://localhost:5173`, then:
+浏览器访问 `http://localhost:5173`，然后：
 
-1. Click **"🔗 Connect Wallet"** - Authorize MetaMask access
-2. Click **"📝 Submit Task"** - Submit Attestation task
-3. Click **"✅ Execute Attestation"** - Perform verification
-4. Click **"🔄 Query Result"** - Get final result
+1. 点击 **"🔗 连接钱包"** - 授权 MetaMask 访问
+2. 点击 **"📝 提交任务"** - 提交 Attestation 任务
+3. 点击 **"✅ 执行 Attestation"** - 执行验证
+4. 点击 **"🔄 查询结果"** - 获取最终结果
 
 ---
 
-## Complete Flow
+## 完整流程说明
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│ Connect     │ ──► │ Submit      │ ──► │ Execute     │ ──► │ Query       │
-│ Wallet      │     │ Task        │     │ Attestation │     │ Result      │
+│  连接钱包   │ ──► │  提交任务   │ ──► │ 执行 Attest │ ──► │  查询结果   │
+│  Initialize │     │ submitTask  │     │   attest    │     │ pollResult  │
 └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
      │                   │                   │                   │
      ▼                   ▼                   ▼                   ▼
-  Get Address        Create Task        Node Verification   Get Result
-  Switch Network     Assign Attestor    Submit Report       Parse Data
+  获取地址            创建任务            节点验证            获取结果
+  切换网络           分配 Attestor      提交报告            解析数据
 ```
 
 ---
 
-## FAQ
+## 常见问题
 
 ### 1. "MetaMask not detected"
-- Ensure MetaMask extension is installed
-- Refresh the page and try again
+- 确保已安装 MetaMask 扩展
+- 刷新页面重试
 
 ### 2. "chainId is not supported"
-- Ensure you're using a supported network (84532 or 8453)
-- Check if wallet is switched to the correct network
+- 确保使用支持的网络（84532 或 8453）
+- 检查钱包是否已切换到正确网络
 
-### 3. Transaction Failed / Insufficient Gas
-- Ensure wallet has enough testnet ETH
-- Get ETH from [Base Sepolia Faucet](https://sepolia.basescan.org/faucet)
+### 3. 交易失败/Gas 不足
+- 确保钱包有足够的测试网 ETH
+- 从 [Base Sepolia Faucet](https://sepolia.basescan.org/faucet) 获取
 
-### 4. Attestation Timeout
-- Increase `timeoutMs` parameter
-- Check network connection
-- Verify template configuration is correct
-
----
-
-## Next Steps
-
-- Read [Complete API Documentation](./API-REFERENCE.md)
-- Check [Example Code](https://github.com/primus-labs/zktls-demo/tree/main/network-sdk-example)
-- Create more templates on [Developer Platform](https://dev.primuslabs.xyz)
+### 4. Attestation 超时
+- 增加 `timeoutMs` 参数
+- 检查网络连接
+- 确认模板配置正确
 
 ---
 
-**Need Help?** Visit [Primus Discord](https://discord.gg/primus) or submit a GitHub Issue
+## 下一步
+
+- 阅读 [完整 API 文档](./API-REFERENCE.md)
+- 查看 [示例代码](https://github.com/primus-labs/zktls-demo/tree/main/network-sdk-example)
+- 在 [开发者平台](https://dev.primuslabs.xyz) 创建更多模板
+
+---
+
+**需要帮助？** 访问 [Primus Discord](https://discord.gg/primus) 或提交 GitHub Issue
