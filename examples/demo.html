@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Primus Network SDK Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+    .header h1 { font-size: 28px; margin-bottom: 8px; }
+    .header p { opacity: 0.9; font-size: 14px; }
+    .content { padding: 30px; }
+    
+    .step {
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      transition: all 0.3s;
+    }
+    .step.active {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+    .step.completed {
+      border-color: #4caf50;
+      background: #f1f8e9;
+    }
+    .step.failed {
+      border-color: #f44336;
+      background: #ffebee;
+    }
+    
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 15px;
+    }
+    .step-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #e0e0e0;
+      color: #666;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    .step.active .step-number {
+      background: #667eea;
+      color: white;
+    }
+    .step.completed .step-number {
+      background: #4caf50;
+      color: white;
+    }
+    .step.failed .step-number {
+      background: #f44336;
+      color: white;
+    }
+    
+    .step-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+    }
+    
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .output {
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 15px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    
+    .status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: auto;
+    }
+    .status.pending { background: #fff3cd; color: #856404; }
+    .status.success { background: #d4edda; color: #155724; }
+    .status.error { background: #f8d7da; color: #721c24; }
+    
+    .config-section {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    .config-section label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 600;
+      color: #856404;
+    }
+    .config-section input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ffc107;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    
+    .progress-bar {
+      height: 4px;
+      background: #e0e0e0;
+      border-radius: 2px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      width: 0%;
+      transition: width 0.3s;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🔐 Primus Network SDK Demo</h1>
+      <p>完整的 Attestation 流程演示</p>
+    </div>
+    
+    <div class="content">
+      <!-- 配置区域 -->
+      <div class="config-section">
+        <label>Template ID (在 dev.primuslabs.xyz 创建)</label>
+        <input type="text" id="templateId" placeholder="例如：2e3160ae-8b1e-45e3-8c59-426366278b9d" value="">
+        <small style="color: #856404; display: block; margin-top: 8px;">
+          ⚠️ 请先在 <a href="https://dev.primuslabs.xyz" target="_blank">Primus 开发者平台</a> 创建模板
+        </small>
+      </div>
+      
+      <!-- 步骤 1: 连接钱包 -->
+      <div class="step" id="step1">
+        <div class="step-header">
+          <div class="step-number">1</div>
+          <div class="step-title">连接钱包</div>
+          <span class="status pending" id="status1">等待开始</span>
+        </div>
+        <button onclick="connectWallet()" id="btn1">🔗 连接 MetaMask</button>
+        <div class="output" id="output1" style="display: none;"></div>
+      </div>
+      
+      <!-- 步骤 2: 提交任务 -->
+      <div class="step" id="step2">
+        <div class="step-header">
+          <div class="step-number">2</div>
+          <div class="step-title">提交任务</div>
+          <span class="status pending" id="status2">等待上一步</span>
+        </div>
+        <button onclick="submitTask()" id="btn2" disabled>📝 提交 Attestation 任务</button>
+        <div class="output" id="output2" style="display: none;"></div>
+      </div>
+      
+      <!-- 步骤 3: 执行 Attestation -->
+      <div class="step" id="step3">
+        <div class="step-header">
+          <div class="step-number">3</div>
+          <div class="step-title">执行 Attestation</div>
+          <span class="status pending" id="status3">等待上一步</span>
+        </div>
+        <button onclick="attestTask()" id="btn3" disabled>✅ 执行验证</button>
+        <div class="output" id="output3" style="display: none;"></div>
+      </div>
+      
+      <!-- 步骤 4: 查询结果 -->
+      <div class="step" id="step4">
+        <div class="step-header">
+          <div class="step-number">4</div>
+          <div class="step-title">查询结果</div>
+          <span class="status pending" id="status4">等待上一步</span>
+        </div>
+        <button onclick="pollResult()" id="btn4" disabled>🔄 轮询任务结果</button>
+        <div class="output" id="output4" style="display: none;"></div>
+      </div>
+      
+      <!-- 进度条 -->
+      <div class="progress-bar">
+        <div class="progress-bar-fill" id="progressBar"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { PrimusNetwork } from "https://cdn.jsdelivr.net/npm/@primuslabs/network-js-sdk@latest/+esm";
+    import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@5.7.2/+esm";
+
+    const CHAIN_ID = 84532; // Base Sepolia
+    
+    let primusNetwork;
+    let signer;
+    let userAddress;
+    let submitTaskResult;
+    let attestResult;
+
+    // 更新状态
+    window.updateStatus = (step, status, message) => {
+      const statusEl = document.getElementById(`status${step}`);
+      statusEl.textContent = message;
+      statusEl.className = `status ${status}`;
+      
+      const stepEl = document.getElementById(`step${step}`);
+      stepEl.className = `step ${status === 'success' ? 'completed' : status === 'error' ? 'failed' : status === 'active' ? 'active' : ''}`;
+      
+      // 更新进度条
+      const completedSteps = [1, 2, 3, 4].filter(i => {
+        const el = document.getElementById(`status${i}`);
+        return el && el.classList.contains('success');
+      }).length;
+      document.getElementById('progressBar').style.width = `${(completedSteps / 4) * 100}%`;
+    };
+
+    // 显示输出
+    window.showOutput = (step, text) => {
+      const outputEl = document.getElementById(`output${step}`);
+      outputEl.textContent = text;
+      outputEl.style.display = 'block';
+    };
+
+    // 启用下一步按钮
+    window.enableNext = (step) => {
+      const btn = document.getElementById(`btn${step}`);
+      if (btn) btn.disabled = false;
+      
+      const nextStatus = document.getElementById(`status${step}`);
+      if (nextStatus) nextStatus.textContent = '准备就绪';
+    };
+
+    // 步骤 1: 连接钱包
+    window.connectWallet = async () => {
+      try {
+        updateStatus(1, 'active', '连接中...');
+        
+        if (!window.ethereum) {
+          throw new Error('MetaMask 未安装');
+        }
+        
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = provider.getSigner();
+        userAddress = await signer.getAddress();
+        
+        // 切换网络
+        try {
+          await provider.send("wallet_switchEthereumChain", [
+            { chainId: "0x" + CHAIN_ID.toString(16) }
+          ]);
+        } catch (switchError) {
+          if (switchError.code === 4902) {
+            await provider.send("wallet_addEthereumChain", [{
+              chainId: "0x" + CHAIN_ID.toString(16),
+              chainName: "Base Sepolia",
+              rpcUrls: ["https://sepolia.base.org"],
+              nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+              blockExplorerUrls: ["https://sepolia.basescan.org"]
+            }]);
+          }
+        }
+        
+        // 初始化 SDK
+        primusNetwork = new PrimusNetwork();
+        await primusNetwork.init(signer, CHAIN_ID);
+        
+        updateStatus(1, 'success', '已连接');
+        showOutput(1, `钱包地址：${userAddress}\n网络：Base Sepolia (84532)\nSDK: 已初始化`);
+        enableNext(2);
+        
+      } catch (error) {
+        updateStatus(1, 'error', '失败');
+        showOutput(1, `错误：${error.message}`);
+      }
+    };
+
+    // 步骤 2: 提交任务
+    window.submitTask = async () => {
+      try {
+        updateStatus(2, 'active', '提交中...');
+        
+        const templateId = document.getElementById('templateId').value;
+        if (!templateId) {
+          throw new Error('请输入 Template ID');
+        }
+        
+        submitTaskResult = await primusNetwork.submitTask({
+          templateId,
+          address: userAddress
+        });
+        
+        updateStatus(2, 'success', '已完成');
+        showOutput(2, `任务 ID: ${submitTaskResult.taskId}\n交易哈希：${submitTaskResult.taskTxHash}\nAttestors: ${submitTaskResult.taskAttestors.join(', ')}\n提交时间：${new Date(submitTaskResult.submittedAt * 1000).toISOString()}`);
+        enableNext(3);
+        
+      } catch (error) {
+        updateStatus(2, 'error', '失败');
+        showOutput(2, `错误：${error.message}`);
+      }
+    };
+
+    // 步骤 3: 执行 Attestation
+    window.attestTask = async () => {
+      try {
+        updateStatus(3, 'active', '执行中...');
+        
+        const templateId = document.getElementById('templateId').value;
+        
+        attestResult = await primusNetwork.attest({
+          templateId,
+          address: userAddress,
+          ...submitTaskResult
+        });
+        
+        updateStatus(3, 'success', '已完成');
+        showOutput(3, `Attestor: ${attestResult[0].attestor}\n报告哈希：${attestResult[0].reportTxHash}\nURL: ${attestResult[0].attestorUrl}\n时间：${new Date(attestResult[0].attestationTime * 1000).toISOString()}`);
+        enableNext(4);
+        
+      } catch (error) {
+        updateStatus(3, 'error', '失败');
+        showOutput(3, `错误：${error.message}`);
+      }
+    };
+
+    // 步骤 4: 查询结果
+    window.pollResult = async () => {
+      try {
+        updateStatus(4, 'active', '轮询中...');
+        
+        const taskResult = await primusNetwork.verifyAndPollTaskResult({
+          taskId: attestResult[0].taskId,
+          reportTxHash: attestResult[0].reportTxHash,
+          intervalMs: 2000,
+          timeoutMs: 120000
+        });
+        
+        updateStatus(4, 'success', '已完成');
+        showOutput(4, `任务状态：SUCCESS\n结果：${JSON.stringify(taskResult, null, 2)}`);
+        
+        alert('🎉 恭喜！完整流程已完成！');
+        
+      } catch (error) {
+        updateStatus(4, 'error', '失败');
+        showOutput(4, `错误：${error.message}`);
+      }
+    };
+  </script>
+</body>
+</html>
