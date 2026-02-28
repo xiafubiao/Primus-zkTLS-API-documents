@@ -163,7 +163,7 @@ const result = await primusNetwork.submitTask({
 - **TypeScript**: >= 4.9.x
 - **ethers**: 5.x
 - **Wallet**: MetaMask or WalletConnect
-- **Browser**: Chrome/Edge/Firefox with Primus Extension
+- **Browser**: Chrome/Edge with Primus Extension
 
 ---
 
